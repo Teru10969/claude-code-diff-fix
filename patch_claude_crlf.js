@@ -10,9 +10,11 @@
  * causing a "String not found in file" error that silently falls back
  * to inline display.
  *
- * This script applies two patches:
- *   1. Edit function: normalizes \r\n to \n in both file content and edit strings
- *   2. Diff function: normalizes \r\n in the left-side temp file content
+ * This script applies three patches:
+ *   1. Edit function (extension.js): normalizes \r\n to \n in both file content and edit strings
+ *   2. Diff function (extension.js): normalizes \r\n in the left-side temp file content
+ *   3. Webview permission handler (webview/index.js): removes IS_FULL_EDITOR check
+ *      that prevents the diff tab from opening when Claude runs in an editor tab
  *
  * The patches are found by content signatures, not variable names,
  * so this works across minified versions with different variable names.
@@ -35,6 +37,14 @@
  *   1.0.2 - Accept a directory path as argument (auto-appends extension.js).
  *           Also extracts version number from path for better logging.
  *           Verified working on 2.1.75 and 2.1.76.
+ *
+ *   2.0.0 - Added Patch 3: removes if(window.IS_FULL_EDITOR)return; from the
+ *           webview permission handler in webview/index.js. This check was added
+ *           in extension v2.1.59 and prevents the diff tab from opening when
+ *           Claude runs in an editor tab (vs sidebar). The IS_FULL_EDITOR flag
+ *           is also set incorrectly during panel deserialization due to a VS Code
+ *           timing issue where viewColumn is not yet finalized.
+ *           Verified working on 2.1.56 through 2.1.92.
  */
 
 const fs = require('fs');
@@ -280,5 +290,33 @@ if (patchBytes.includes('0d0a')) {
   process.exit(1);
 }
 
-console.log('\nPatches applied successfully!');
+// --- Patch 3: Remove IS_FULL_EDITOR check from webview/index.js ---
+const webviewPath = path.join(info.dir, 'webview', 'index.js');
+const webviewBakPath = webviewPath + '.bak';
+
+if (fs.existsSync(webviewPath)) {
+  let webviewContent = fs.readFileSync(webviewPath, 'utf8');
+  const fullEditorPattern = /if\(window\.IS_FULL_EDITOR\)return;/g;
+  const matches = webviewContent.match(fullEditorPattern);
+
+  if (matches && matches.length > 0) {
+    // Backup
+    if (!fs.existsSync(webviewBakPath)) {
+      fs.copyFileSync(webviewPath, webviewBakPath);
+      console.log('Webview backup saved to:', webviewBakPath);
+    } else {
+      console.log('Webview backup already exists at:', webviewBakPath);
+    }
+
+    webviewContent = webviewContent.replace(fullEditorPattern, '');
+    fs.writeFileSync(webviewPath, webviewContent);
+    console.log('  -> Patch 3 applied: removed ' + matches.length + ' IS_FULL_EDITOR check(s) from webview/index.js');
+  } else {
+    console.log('  -> Patch 3 (IS_FULL_EDITOR) appears to be already applied, skipping.');
+  }
+} else {
+  console.log('  -> Patch 3 skipped: webview/index.js not found (may be a different extension layout)');
+}
+
+console.log('\nAll patches applied successfully!');
 console.log('Please reload VS Code (Ctrl+Shift+P -> "Developer: Reload Window") for changes to take effect.');

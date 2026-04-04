@@ -50,15 +50,15 @@ Single-line edits aren't affected because the `oldString` has no newline charact
 
 ## Re-applying After Extension Updates
 
-When the Claude Code extension updates, the patched `extension.js` is replaced with a new version. You'll need to re-run the patch script. The `.bak` file from the previous version will not be overwritten.
+When the Claude Code extension updates, both patched files (`extension.js` and `webview/index.js`) are replaced with new versions. You'll need to re-run the patch script. The `.bak` files from the previous version will not be overwritten.
 
 ## What's Being Patched
 
-Two patches are made to the extension's `extension.js` file:
+Three patches across two files in the extension directory:
 
 ### Patch 1 — Edit Function (CRLF normalization)
 
-At the start of the edit-applying function, the script normalizes all `\r\n` to `\n` in both the file content and the edit strings (oldString/newString) before attempting to match:
+At the start of the edit-applying function, normalize all `\r\n` to `\n` in both the file content and the edit strings (oldString/newString) before attempting to match:
 
 ```js
 // Before (minified, variable names vary by version):
@@ -94,6 +94,29 @@ if($.includes("\r\n")){
 let W=Fk($ ...
 ```
 
+### Patch 3 — Webview Permission Handler (IS_FULL_EDITOR bypass removal)
+
+Starting in extension v2.1.59, the webview's permission handler skips opening the diff tab when `window.IS_FULL_EDITOR` is `true`, falling back to inline accept/reject in the chat. This was intended to differentiate between editor-tab mode and sidebar mode, but the `IS_FULL_EDITOR` flag is set incorrectly during panel deserialization — VS Code reports the wrong `viewColumn` before the layout is finalized, so the Claude panel in the second tab group is misidentified as being in the first group.
+
+This patch removes the `if(window.IS_FULL_EDITOR)return;` checks from the permission handler in `webview/index.js`, restoring the diff tab behavior:
+
+```js
+// Before (in webview/index.js permission handler):
+if($.toolName===EditTool.toolName){
+  if(window.IS_FULL_EDITOR)return;    // <-- skips diff tab
+  let Z=new AbortController;
+  ...
+  let X=await J.openDiff(...);
+
+// After:
+if($.toolName===EditTool.toolName){
+  let Z=new AbortController;
+  ...
+  let X=await J.openDiff(...);
+```
+
+The same removal is applied to both the Edit tool and Write tool handlers.
+
 ## How the Patch Script Works
 
 Since `extension.js` is minified with different variable names in each version, the script finds the right functions by **content signatures** — unique strings and structural patterns that don't change across versions:
@@ -106,15 +129,26 @@ Since `extension.js` is minified with different variable names in each version, 
 ### Finding the Diff Patch Point
 - **Anchor string:** `"leftTempFileProvider.createFile"` — a unique log message in the diff function's catch block
 - **Context matching:** From that anchor, finds the `createFile(VAR,"").uri}` pattern that ends the catch block — this is where the CRLF check is inserted
-- **Variable discovery:** Looks backwards for `let URIVAR=XX.Uri.file(PATHVAR),CONTENTVAR=""` to find the variable names for the left-side URI, the temp file provider, the file content, and the file path — these are used to construct the correct patch for that version. Note: the content variable name varies across versions (`$` in 2.1.71/2.1.73, `Z` in 2.1.72). Since `$` is a valid JS identifier but is not matched by `\w` in regex, the capture group uses `[\w$]+` to handle both cases.
+- **Variable discovery:** Looks backwards for `let URIVAR=XX.Uri.file(PATHVAR),$=""` to find the variable names for the left-side URI, the temp file provider, and the file path — these are used to construct the correct `G=v.createFile(K,$).uri` call for that version
+
+### Gotcha: `$` as a Variable Name
+The minifier sometimes uses `$` as a variable name (e.g., for the file content variable). In JavaScript regex, `\w` does **not** match `$`, so the script uses `[\w$]+` instead of `\w+` when capturing variable names that could be `$`. This tripped us up between versions 2.1.71 (`$`) and 2.1.72 (`Z`) and back to 2.1.73 (`$`).
+
+### Finding the IS_FULL_EDITOR Checks (Patch 3)
+- **File:** `webview/index.js` in the extension directory
+- **Pattern:** Literal string `if(window.IS_FULL_EDITOR)return;`
+- **Action:** Global removal — all occurrences are deleted (typically 2: one for Edit tool, one for Write tool)
+- **Detection:** If the pattern is not found, assumes already patched
 
 ### Safety Features
-- Creates a `.bak` backup before modifying
+- Creates `.bak` backups for both `extension.js` and `webview/index.js` before modifying
 - Idempotent — detects and skips already-applied patches
 - Validates output bytes to ensure `\r\n` was written as escape sequences (`\x5c\x72\x5c\x6e`) not raw CR/LF bytes (`\x0d\x0a`)
 
 ## Notes
 
-- This fix was developed and tested on Claude Code extension versions 2.1.56, 2.1.69, 2.1.71, 2.1.72, 2.1.73, 2.1.74, 2.1.75, 2.1.76, 2.1.77, and 2.1.78 on both Windows and Linux (Remote SSH).
+- Patches 1 & 2 (CRLF) were developed and tested on extension versions 2.1.56 through 2.1.78.
+- Patch 3 (IS_FULL_EDITOR) was developed and tested on extension versions 2.1.59 through 2.1.92. It is not needed on versions before 2.1.59 since the IS_FULL_EDITOR check did not exist yet.
+- All patches tested on both Windows and Linux (Remote SSH).
 - The underlying bug should ideally be fixed in the extension itself. Consider upvoting or commenting on the relevant issue at https://github.com/anthropics/claude-code/issues if one exists.
 - The patch only modifies the side-by-side diff preview mechanism. It does not affect how edits are actually applied to files.
