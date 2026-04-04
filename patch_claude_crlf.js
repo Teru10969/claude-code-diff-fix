@@ -74,7 +74,7 @@ function findExtensionJs() {
         // Extract version number for sorting
         const verMatch = entry.match(/(\d+\.\d+\.\d+)/);
         const ver = verMatch ? verMatch[1] : '0.0.0';
-        candidates.push({ path: jsPath, version: ver, dir: entry });
+        candidates.push({ path: jsPath, version: ver, dir: path.join(extDir, entry) });
       }
     }
   }
