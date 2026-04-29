@@ -131,8 +131,8 @@ Since `extension.js` is minified with different variable names in each version, 
 - **Context matching:** From that anchor, finds the `createFile(VAR,"").uri}` pattern that ends the catch block — this is where the CRLF check is inserted
 - **Variable discovery:** Looks backwards for `let URIVAR=XX.Uri.file(PATHVAR),$=""` to find the variable names for the left-side URI, the temp file provider, and the file path — these are used to construct the correct `G=v.createFile(K,$).uri` call for that version
 
-### Gotcha: `$` as a Variable Name
-The minifier sometimes uses `$` as a variable name (e.g., for the file content variable). In JavaScript regex, `\w` does **not** match `$`, so the script uses `[\w$]+` instead of `\w+` when capturing variable names that could be `$`. This tripped us up between versions 2.1.71 (`$`) and 2.1.72 (`Z`) and back to 2.1.73 (`$`).
+### Gotcha: `$` as a Variable or Function Name
+The minifier sometimes uses `$` in identifiers — both as a standalone variable (e.g., the file content variable in the diff function) and as a leading character in a function name (e.g., the edit function was renamed from `fc` to `$c` in 2.1.121). In JavaScript regex, `\w` does **not** match `$`, so the script uses `[\w$]+` instead of `\w+` when capturing identifiers that could contain `$`. This tripped us up between versions 2.1.71 (content var `$`) and 2.1.72 (`Z`) and back to 2.1.73 (`$`), and again at 2.1.121 when the edit function name itself became `$c`.
 
 ### Finding the IS_FULL_EDITOR Checks (Patch 3)
 - **File:** `webview/index.js` in the extension directory
@@ -147,8 +147,8 @@ The minifier sometimes uses `$` as a variable name (e.g., for the file content v
 
 ## Notes
 
-- Patches 1 & 2 (CRLF) were developed and tested on extension versions 2.1.56 through 2.1.78.
-- Patch 3 (IS_FULL_EDITOR) was developed and tested on extension versions 2.1.59 through 2.1.92. It is not needed on versions before 2.1.59 since the IS_FULL_EDITOR check did not exist yet.
+- Patches 1 & 2 (CRLF) were developed and tested on extension versions 2.1.56 through 2.1.123.
+- Patch 3 (IS_FULL_EDITOR) was developed and tested on extension versions 2.1.59 through 2.1.123. It is not needed on versions before 2.1.59 since the IS_FULL_EDITOR check did not exist yet.
 - All patches tested on both Windows and Linux (Remote SSH).
 - The underlying bug should ideally be fixed in the extension itself. Consider upvoting or commenting on the relevant issue at https://github.com/anthropics/claude-code/issues if one exists.
 - The patch only modifies the side-by-side diff preview mechanism. It does not affect how edits are actually applied to files.

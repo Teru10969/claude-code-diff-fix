@@ -45,6 +45,13 @@
  *           is also set incorrectly during panel deserialization due to a VS Code
  *           timing issue where viewColumn is not yet finalized.
  *           Verified working on 2.1.56 through 2.1.92.
+ *
+ *   2.0.1 - Allow '$' in the edit function name. In 2.1.121 the minifier renamed
+ *           the edit function to '$c', and \w in regex doesn't match '$', so the
+ *           findEditFunction regexes failed. Changed the function-name capture
+ *           groups from (\w+) to ([\w$]+) (the same fix already applied earlier
+ *           to the content-var capture in findDiffPatchPoint). Verified working
+ *           on 2.1.121, 2.1.122, and 2.1.123.
  */
 
 const fs = require('fs');
@@ -98,7 +105,7 @@ function findEditFunction(content) {
   // The edit function has this structure:
   //   function XX(a,b){let c=a,d=[];if(!a&&b.length===1&&b[0]&&b[0].oldString===""...
   // It contains unique error messages we can use to verify.
-  const match = content.match(/function\s+(\w+)\((\w+),(\w+)\)\{let\s+(\w+)=\2,\w+=\[\];if\(!\2/);
+  const match = content.match(/function\s+([\w$]+)\((\w+),(\w+)\)\{let\s+(\w+)=\2,\w+=\[\];if\(!\2/);
   if (match) {
     const funcName = match[1];
     const param1 = match[2];
@@ -113,7 +120,7 @@ function findEditFunction(content) {
   }
 
   // Try matching already-patched version: function XX(a,b){a=a.replace(...)...let c=a,
-  const patchedMatch = content.match(/function\s+(\w+)\((\w+),(\w+)\)\{\2=\2\.replace\(/);
+  const patchedMatch = content.match(/function\s+([\w$]+)\((\w+),(\w+)\)\{\2=\2\.replace\(/);
   if (patchedMatch) {
     const funcName = patchedMatch[1];
     const param1 = patchedMatch[2];
