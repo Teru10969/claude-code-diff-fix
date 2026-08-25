@@ -147,8 +147,8 @@ The minifier sometimes uses `$` in identifiers — both as a standalone variable
 
 ## Notes
 
-- Patches 1 & 2 (CRLF) were developed and tested on extension versions 2.1.56 through 2.1.123.
-- Patch 3 (IS_FULL_EDITOR) was developed and tested on extension versions 2.1.59 through 2.1.123. It is not needed on versions before 2.1.59 since the IS_FULL_EDITOR check did not exist yet.
+- Patches 1 & 2 (CRLF) were developed and tested on extension versions 2.1.56 through 2.1.123, and re-verified on 2.1.245.
+- Patch 3 (IS_FULL_EDITOR) was developed and tested on extension versions 2.1.59 through 2.1.123, and re-verified on 2.1.245. It is not needed on versions before 2.1.59 since the IS_FULL_EDITOR check did not exist yet.
 - All patches tested on both Windows and Linux (Remote SSH).
 - The underlying bug should ideally be fixed in the extension itself. Consider upvoting or commenting on the relevant issue at https://github.com/anthropics/claude-code/issues if one exists.
 - The patch only modifies the side-by-side diff preview mechanism. It does not affect how edits are actually applied to files.

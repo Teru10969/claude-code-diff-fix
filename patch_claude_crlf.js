@@ -52,6 +52,12 @@
  *           groups from (\w+) to ([\w$]+) (the same fix already applied earlier
  *           to the content-var capture in findDiffPatchPoint). Verified working
  *           on 2.1.121, 2.1.122, and 2.1.123.
+ *
+ *   2.0.2 - Allow '$' in the parameter captures too. In 2.1.245 the minifier named the edit
+ *           function's parameters '$' and 'J' (function dQ0(\$,J)), and the diff function's
+ *           URI provider became 'Z\$' (Z\$.Uri.file). The regexes used (\w+) for parameters
+ *           and (\w+)\.Uri for the provider, which don't match '\$'. Changed those captures
+ *           to ([\w\$]+) / [\w\$]+\.Uri. Verified working on 2.1.245.
  */
 
 const fs = require('fs');
@@ -105,7 +111,7 @@ function findEditFunction(content) {
   // The edit function has this structure:
   //   function XX(a,b){let c=a,d=[];if(!a&&b.length===1&&b[0]&&b[0].oldString===""...
   // It contains unique error messages we can use to verify.
-  const match = content.match(/function\s+([\w$]+)\((\w+),(\w+)\)\{let\s+(\w+)=\2,\w+=\[\];if\(!\2/);
+  const match = content.match(/function\s+([\w$]+)\(([\w$]+),([\w$]+)\)\{let\s+(\w+)=\2,\w+=\[\];if\(!\2/);
   if (match) {
     const funcName = match[1];
     const param1 = match[2];
@@ -120,7 +126,7 @@ function findEditFunction(content) {
   }
 
   // Try matching already-patched version: function XX(a,b){a=a.replace(...)...let c=a,
-  const patchedMatch = content.match(/function\s+([\w$]+)\((\w+),(\w+)\)\{\2=\2\.replace\(/);
+  const patchedMatch = content.match(/function\s+([\w$]+)\(([\w$]+),([\w$]+)\)\{\2=\2\.replace\(/);
   if (patchedMatch) {
     const funcName = patchedMatch[1];
     const param1 = patchedMatch[2];
@@ -153,7 +159,7 @@ function findDiffPatchPoint(content) {
   // Find the left URI variable and the createFile provider variable
   // Look backwards from ltfpIdx for: let URIVAR=XX.Uri.file(PATHVAR),CONTENTVAR="";
   const beforeArea = content.substring(ltfpIdx - 400, ltfpIdx);
-  const uriMatch = beforeArea.match(/let\s+(\w+)=\w+\.Uri\.file\((\w+)\),([\w$]+)=""/);
+  const uriMatch = beforeArea.match(/let\s+(\w+)=[\w$]+\.Uri\.file\((\w+)\),([\w$]+)=""/);
   if (!uriMatch) return null;
 
   const leftUriVar = uriMatch[1]; // G in 2.1.71
